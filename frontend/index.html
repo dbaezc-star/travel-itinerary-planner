@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Travel Itinerary Planner</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
@@ -14,7 +14,7 @@
         .card { background: #16213e; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
         .card h2 { color: #e94560; margin-bottom: 15px; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        input, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #e94560; background: #0f3460; color: #eee; }
+        input { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #e94560; background: #0f3460; color: #eee; }
         button { padding: 10px 25px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; }
         button:hover { background: #c73652; }
         table { width: 100%; border-collapse: collapse; }
@@ -25,7 +25,7 @@
     </style>
 </head>
 <body>
-<header><h1>✈ Travel Itinerary Planner</h1></header>
+<header><h1>Travel Itinerary Planner</h1></header>
 <div class="container">
     <div class="card">
         <h2>Mapa de Aeropuertos</h2>
@@ -38,62 +38,74 @@
             <input id="travel_date" type="date" />
             <input id="departure_id" type="number" placeholder="ID Aeropuerto Salida" />
             <input id="arrival_id" type="number" placeholder="ID Aeropuerto Llegada" />
-            <input id="duration" type="number" placeholder="Duración (minutos)" />
-            <button onclick="createItinerary()">Crear Itinerario</button>
+            <input id="duration" type="number" placeholder="Duracion en minutos" />
+            <button id="btn-crear">Crear Itinerario</button>
         </div>
     </div>
     <div class="card">
         <h2>Mis Itinerarios</h2>
         <table>
-            <thead><tr><th>ID</th><th>Viajero</th><th>Salida</th><th>Llegada</th><th>Fecha</th><th>Duración</th><th>Acción</th></tr></thead>
+            <thead><tr><th>ID</th><th>Viajero</th><th>Salida</th><th>Llegada</th><th>Fecha</th><th>Duracion</th><th>Accion</th></tr></thead>
             <tbody id="itineraries-table"></tbody>
         </table>
     </div>
 </div>
 <script>
-const AIRPORT_API = 'http://localhost:8001';
-const ITINERARY_API = 'http://localhost:8002';
+var AIRPORT_API = 'http://localhost:8001';
+var ITINERARY_API = 'http://localhost:8002';
 
-async function loadMap() {
-    const res = await fetch(AIRPORT_API + '/airports/map-data');
-    const data = await res.json();
-    Plotly.newPlot('map', [data], {
-        geo: { scope: 'south america', showland: true, landcolor: '#0f3460', showocean: true, oceancolor: '#1a1a2e', countrycolor: '#e94560' },
-        paper_bgcolor: '#16213e', plot_bgcolor: '#16213e', font: { color: '#eee' },
-        margin: { t: 0, b: 0, l: 0, r: 0 }
-    });
+function loadMap() {
+    fetch(AIRPORT_API + '/airports/map-data')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            Plotly.newPlot('map', [data], {
+                geo: { scope: 'south america', showland: true, landcolor: '#0f3460', showocean: true, oceancolor: '#1a1a2e', countrycolor: '#e94560' },
+                paper_bgcolor: '#16213e', plot_bgcolor: '#16213e',
+                font: { color: '#eee' },
+                margin: { t: 0, b: 0, l: 0, r: 0 }
+            });
+        })
+        .catch(function(e){ console.error('Error cargando mapa', e); });
 }
 
-async function loadItineraries() {
-    const res = await fetch(ITINERARY_API + '/itineraries/');
-    const data = await res.json();
-    const tbody = document.getElementById('itineraries-table');
-    tbody.innerHTML = data.map(i => 
-        <tr>
-            <td></td><td></td>
-            <td></td><td></td>
-            <td></td><td> min</td>
-            <td><button class="btn-delete" onclick="deleteItinerary()">Eliminar</button></td>
-        </tr>).join('');
+function loadItineraries() {
+    fetch(ITINERARY_API + '/itineraries/')
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+            var tbody = document.getElementById('itineraries-table');
+            tbody.innerHTML = data.map(function(i){
+                return '<tr><td>' + i.id + '</td><td>' + i.user_name + '</td><td>' + i.departure_airport_id + '</td><td>' + i.arrival_airport_id + '</td><td>' + i.travel_date + '</td><td>' + i.duration_minutes + ' min</td><td><button class="btn-delete" onclick="deleteItinerary(' + i.id + ')">Eliminar</button></td></tr>';
+            }).join('');
+        })
+        .catch(function(e){ console.error('Error cargando itinerarios', e); });
 }
 
-async function createItinerary() {
-    const body = {
+function createItinerary() {
+    var body = {
         user_name: document.getElementById('user_name').value,
         travel_date: document.getElementById('travel_date').value,
         departure_airport_id: parseInt(document.getElementById('departure_id').value),
         arrival_airport_id: parseInt(document.getElementById('arrival_id').value),
-        duration_minutes: parseInt(document.getElementById('duration').value),
+        duration_minutes: parseInt(document.getElementById('duration').value)
     };
-    const res = await fetch(ITINERARY_API + '/itineraries/', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-    if (res.ok) { alert('Itinerario creado!'); loadItineraries(); }
-    else { const err = await res.json(); alert('Error: ' + JSON.stringify(err.detail)); }
+    fetch(ITINERARY_API + '/itineraries/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    })
+    .then(function(r){
+        if(r.ok){ alert('Itinerario creado!'); loadItineraries(); }
+        else { r.json().then(function(e){ alert('Error: ' + JSON.stringify(e.detail)); }); }
+    })
+    .catch(function(e){ alert('Error de conexion: ' + e); });
 }
 
-async function deleteItinerary(id) {
-    await fetch(ITINERARY_API + '/itineraries/' + id, { method: 'DELETE' });
-    loadItineraries();
+function deleteItinerary(id) {
+    fetch(ITINERARY_API + '/itineraries/' + id, { method: 'DELETE' })
+        .then(function(){ loadItineraries(); });
 }
+
+document.getElementById('btn-crear').addEventListener('click', createItinerary);
 
 loadMap();
 loadItineraries();
